@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAM Expert Match</title>
+<meta name="description" content="SAM: an AI agent that analyses a cultural project's needs and matches the entrepreneur with the right experts and technical talent.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* SAM Expert Match. Layout idea: one composer, then a two-column workspace:
+   the agent's visible trace beside the results it produces. Single dark theme by choice
+   (SAM brand): orange = heritage, lavender = change. */
+:root{
+  color-scheme:dark;
+  --bg:#070608; --panel:#111015; --panel2:#17151c; --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.18);
+  --text:#f6f3ee; --muted:#a9a4af; --faint:#77727d;
+  --orange:#ff9d4d; --amber:#ffc890; --lav:#b8a6ff; --cream:#f3e7d6;
+  --ok:#7fe0b0; --warn:#ffcf70;
+  --display:"Readex Pro","IBM Plex Sans Arabic",system-ui,sans-serif;
+  --body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --grad:linear-gradient(100deg,#ffb877 0%,#ffd9b5 40%,#c9bbff 100%);
+  --r:22px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.7;overflow-x:hidden;min-height:100vh}
+body:before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
+  background:radial-gradient(circle at 18% 12%,rgba(255,157,77,.16),transparent 28%),radial-gradient(circle at 85% 8%,rgba(184,166,255,.15),transparent 28%),radial-gradient(circle at 60% 90%,rgba(143,124,240,.09),transparent 30%);filter:blur(30px)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--amber)}
+:focus-visible{outline:2px solid var(--lav);outline-offset:2px;border-radius:8px}
+h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.35}
+[dir=ltr] h1,[dir=ltr] h2{letter-spacing:-.02em;line-height:1.15}
+p{margin:0}
+.wrap{width:min(100% - 32px,1180px);margin-inline:auto}
+.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hidden{display:none!important}
+
+/* ---------- Top bar ---------- */
+.top{position:sticky;top:12px;z-index:30;margin-top:12px}
+.bar{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;padding-inline:14px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(14,13,18,.78);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 16px 50px rgba(0,0,0,.35)}
+.brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;white-space:nowrap}
+.mark{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:10px;font-weight:800;color:#0b0809;background:linear-gradient(145deg,#ffe3c7,#ff9d4d 50%,#b8a6ff);direction:ltr}
+.tabs{display:flex;gap:2px;margin-inline:auto;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:none;color:#c9c5cf;font-size:14px;padding:8px 14px;border-radius:999px;white-space:nowrap;transition:background .2s,color .2s}
+.tabs button:hover{color:#fff;background:rgba(255,255,255,.06)}
+.tabs button.on{background:rgba(255,255,255,.1);color:#fff;font-weight:600}
+.tabs .count{font-size:11px;background:var(--orange);color:#120a04;border-radius:999px;padding:1px 7px;margin-inline-start:6px;font-weight:700}
+.chipbtn{border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:999px;padding:6px 12px;font-size:13px;white-space:nowrap}
+.chipbtn:hover{border-color:var(--line2)}
+.status{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:6px 11px;white-space:nowrap}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.status.live i{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.status.demo i{background:var(--warn)}
+
+/* ---------- Views ---------- */
+.view{display:none;padding:34px 0 80px}
+.view.on{display:block;animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.eyebrow{font-size:13px;color:var(--amber);font-weight:600;margin-bottom:10px}
+.lead{color:var(--muted);max-width:62ch}
+
+/* ---------- Composer ---------- */
+.hero{padding:26px 0 8px;max-width:820px}
+.hero h1{font-size:clamp(34px,5.4vw,60px);font-weight:700}
+.hero .lead{margin-top:14px;font-size:17px}
+.composer{margin-top:24px;border:1px solid var(--line2);border-radius:26px;background:linear-gradient(145deg,rgba(255,255,255,.085),rgba(255,255,255,.03));padding:14px;box-shadow:0 30px 90px rgba(0,0,0,.35);transition:border-color .25s}
+.composer:focus-within{border-color:rgba(255,157,77,.65)}
+.composer textarea{display:block;width:100%;min-height:104px;resize:vertical;border:0;background:none;outline:none;padding:10px 12px;font-size:17px;line-height:1.75}
+.composer textarea::placeholder{color:var(--faint)}
+.crow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 4px 2px}
+.crow .sp{margin-inline-start:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:999px;padding:11px 20px;font-weight:600;font-size:15px;background:#f6f2ec;color:#0b0909;transition:transform .15s,box-shadow .2s,opacity .2s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 12px 34px rgba(255,190,130,.22)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.btn.primary{background:linear-gradient(120deg,#ffd0a3,#ff9d4d 55%,#c3b3ff)}
+.btn.ghost{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--line)}
+.btn.sm{padding:8px 14px;font-size:13px}
+.icon{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.05);display:grid;place-items:center}
+.icon.rec{background:rgba(255,90,90,.18);border-color:rgba(255,120,120,.6);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(255,100,100,.12)}}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+.switch input{accent-color:var(--orange);width:16px;height:16px}
+.examples{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.examples button{text-align:start;border:1px solid var(--line);background:rgba(255,255,255,.035);border-radius:16px;padding:10px 14px;font-size:14px;color:#d6d2da;max-width:360px;line-height:1.6}
+.examples button:hover{border-color:rgba(184,166,255,.55);color:#fff}
+.examples b{display:block;color:var(--lav);font-size:12px;font-weight:600}
+.note{font-size:13px;color:var(--faint);margin-top:12px}
+
+/* ---------- Workspace ---------- */
+.work{display:grid;grid-template-columns:330px 1fr;gap:18px;margin-top:30px;align-items:start}
+.panel{border:1px solid var(--line);border-radius:var(--r);background:rgba(17,16,21,.82);padding:20px}
+.trace{position:sticky;top:78px}
+.trace h3{font-size:16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.steps{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:4px}
+.stepi{position:relative;padding:0 0 14px;padding-inline-start:30px}
+.stepi:before{content:"";position:absolute;inset-inline-start:8px;top:20px;bottom:0;width:1px;background:var(--line)}
+.stepi:last-child:before{display:none}
+.dot{position:absolute;inset-inline-start:0;top:4px;width:17px;height:17px;border-radius:50%;border:1.5px solid var(--faint);display:grid;place-items:center;font-size:10px;color:#0b0809}
+.stepi.run .dot{border-color:var(--orange);border-top-color:transparent;animation:spin .8s linear infinite}
+.stepi.done .dot{background:var(--ok);border-color:var(--ok)}
+.stepi.done .dot:after{content:"✓";font-weight:800}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stepi b{font-weight:600;font-size:14.5px;color:var(--muted)}
+.stepi.run b,.stepi.done b{color:var(--text)}
+.logs{margin-top:6px;display:grid;gap:5px}
+.log{font-family:var(--mono);font-size:11.5px;line-height:1.55;color:#bdb8c4;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:6px 9px;direction:ltr;text-align:left;overflow-wrap:anywhere;animation:fade .3s ease}
+.log em{font-style:normal;color:var(--amber)}
+.log span{color:var(--ok)}
+.results{display:grid;gap:18px;min-width:0}
+.brief h2{font-size:24px}
+.brief p{color:var(--muted);margin-top:8px;max-width:68ch}
+.tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.tag{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:4px 11px;color:#d0ccd5;background:rgba(255,255,255,.03);white-space:nowrap}
+.tag.o{border-color:rgba(255,157,77,.45);color:#ffd9b8}
+.tag.l{border-color:rgba(184,166,255,.45);color:#e0d8ff}
+.tag.dash{border-style:dashed;color:var(--amber);border-color:rgba(255,157,77,.5)}
+.summary{border-inline-start:2px solid var(--orange);padding-inline-start:14px;margin-top:16px;color:#e4e0e8}
+.needs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.need{text-align:start;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035);padding:16px;transition:border-color .2s,background .2s;display:flex;flex-direction:column;gap:6px}
+.need:hover{border-color:var(--line2)}
+.need.on{border-color:rgba(255,157,77,.7);background:rgba(255,157,77,.08)}
+.need small{font-size:12px;color:var(--amber);font-weight:600}
+.need h4{font-size:16px}
+.need p{font-size:13.5px;color:var(--muted);line-height:1.65}
+.sech{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sech h3{font-size:19px}
+.sech span{font-size:13px;color:var(--faint)}
+.matches{display:grid;gap:14px}
+.mcard{border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(150deg,rgba(255,255,255,.07),rgba(255,255,255,.02));padding:20px;display:grid;grid-template-columns:1fr 190px;gap:20px;animation:fade .4s ease}
+.mcard.top{border-color:rgba(255,157,77,.5)}
+.who{display:flex;gap:14px;align-items:flex-start}
+.ava{flex:none;width:52px;height:52px;border-radius:17px;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:19px;color:#0b0809;background:linear-gradient(145deg,#ffd9b5,#b8a6ff)}
+.ava.t{background:linear-gradient(145deg,#d8ceff,#ffb877)}
+.who h4{font-size:18px}
+.who .role{color:var(--muted);font-size:14.5px}
+.why{margin-top:14px}
+.why b,.watch b{display:block;font-size:12.5px;color:var(--lav);font-weight:600;margin-bottom:2px}
+.why p{font-size:15px;color:#ece8f0}
+.watch{margin-top:10px;font-size:13.5px;color:#d8d2c4}
+.watch b{color:var(--warn)}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:14px;font-size:13px;color:var(--muted)}
+.meta span:before{content:"·";margin-inline-end:14px;color:var(--faint)}
+.meta span:first-child:before{display:none}
+.mact{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.scorebox{border-inline-start:1px solid var(--line);padding-inline-start:20px;display:flex;flex-direction:column;gap:10px}
+.ring{--p:80;width:86px;height:86px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--orange) 0,var(--lav) calc(var(--p)*1%),rgba(255,255,255,.08) 0);position:relative}
+.ring:before{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--panel2)}
+.ring b{position:relative;font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums;direction:ltr}
+.ring b small{font-size:11px;color:var(--faint)}
+.fitrow{font-size:12px;color:var(--muted)}
+.fitrow div{display:flex;justify-content:space-between;gap:8px}
+.fitrow div b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:600}
+.track{height:5px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:3px}
+.track i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--orange),var(--lav))}
+[dir=rtl] .track i{background:linear-gradient(270deg,var(--orange),var(--lav))}
+.scorenote{font-size:11px;color:var(--faint);line-height:1.5}
+.empty{border:1px dashed var(--line2);border-radius:var(--r);padding:26px;color:var(--muted);text-align:center}
+.banner{border:1px solid rgba(255,207,112,.4);background:rgba(255,207,112,.07);color:#f1e2bd;border-radius:14px;padding:10px 14px;font-size:14px}
+
+/* ---------- Directory ---------- */
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}
+.filters input,.filters select,.form input,.form select,.form textarea{border:1px solid var(--line);background:rgba(255,255,255,.05);border-radius:12px;padding:9px 12px;outline:none;min-width:0}
+.filters input{flex:1;min-width:200px}
+.filters input:focus,.filters select:focus,.form input:focus,.form select:focus,.form textarea:focus{border-color:rgba(255,157,77,.6)}
+select option{background:#17151c}
+.dir{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.dcard{border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.035);padding:18px;display:flex;flex-direction:column;gap:10px}
+.dcard .who h4{font-size:16px}
+.dcard p{font-size:13.5px;color:var(--muted);line-height:1.65}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.form label{display:grid;gap:5px;font-size:13px;color:var(--muted)}
+.form .full{grid-column:1/-1}
+.pick{display:flex;flex-wrap:wrap;gap:6px}
+.pick button{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:999px;padding:5px 11px;font-size:13px;color:#cfcbd4}
+.pick button.on{border-color:rgba(184,166,255,.7);background:rgba(184,166,255,.15);color:#fff}
+
+/* ---------- Requests & how ---------- */
+.req{border:1px solid var(--line);border-radius:18px;padding:16px 18px;background:rgba(255,255,255,.035);display:grid;gap:8px}
+.req pre{white-space:pre-wrap;font-family:var(--body);font-size:14px;color:#d9d5de;margin:0;background:rgba(0,0,0,.25);border-radius:12px;padding:12px}
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:22px}
+.pnode{border:1px solid var(--line);border-radius:18px;padding:16px;background:rgba(255,255,255,.035);position:relative}
+.pnode small{color:var(--amber);font-size:12px;font-weight:600}
+.pnode h4{font-size:15.5px;margin:6px 0 4px}
+.pnode p{font-size:13px;color:var(--muted);line-height:1.6}
+.pnode code{font-family:var(--mono);font-size:11px;color:var(--lav);direction:ltr;display:inline-block}
+table{width:100%;border-collapse:collapse;font-size:14px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px;margin-top:16px}
+th,td{text-align:start;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-weight:600;font-size:13px;color:var(--amber);background:rgba(255,255,255,.03)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;white-space:nowrap}
+td{color:#d9d5de}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+.stat b{font-family:var(--display);font-size:34px;display:block;line-height:1.2;direction:ltr;text-align:start}
+[dir=rtl] .stat b{text-align:right}
+.stat p{font-size:14px;color:var(--muted);margin-top:6px}
+.stat a{font-size:12px}
+.sec{margin-top:44px}
+.sec>h2{font-size:26px}
+.sec>.lead{margin-top:8px}
+
+/* ---------- Drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;backdrop-filter:blur(3px)}
+.scrim.on{display:block}
+.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(520px,100%);z-index:51;background:#121117;border-inline-start:1px solid var(--line2);padding:24px;overflow-y:auto;transform:translateX(105%);transition:transform .3s ease;display:flex;flex-direction:column;gap:14px}
+[dir=rtl] .drawer{transform:translateX(-105%)}
+.drawer.on{transform:none}
+.drawer textarea{width:100%;min-height:210px;border:1px solid var(--line);background:rgba(255,255,255,.05);border-radius:14px;padding:14px;outline:none;line-height:1.8;resize:vertical}
+.drawer ol{margin:0;padding-inline-start:20px;color:#ddd9e2;font-size:14.5px;display:grid;gap:4px}
+.toast{position:fixed;bottom:22px;inset-inline:0;margin-inline:auto;width:max-content;max-width:calc(100% - 32px);z-index:60;background:#f6f2ec;color:#0b0909;padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--faint);font-size:13px}
+
+@media(max-width:940px){
+  .work{grid-template-columns:1fr}.trace{position:static}
+  .mcard{grid-template-columns:1fr}.scorebox{border:0;padding:0;border-top:1px solid var(--line);padding-top:16px;flex-direction:row;flex-wrap:wrap;align-items:center}
+  .scorebox .fitrow{flex:1;min-width:130px}.scorenote{flex-basis:100%}
+  .pipe{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr}
+  .status span{display:none}.status{padding:8px}
+}
+@media(max-width:560px){
+  .bar{flex-wrap:wrap;border-radius:22px}.tabs{order:3;flex-basis:100%;margin:0}
+  .brand{margin-inline-end:auto}
+  .form{grid-template-columns:1fr}.pipe{grid-template-columns:1fr}
+  .composer textarea{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="wrap top">
+  <div class="bar">
+    <div class="brand"><span class="mark">SAM</span><span data-i="brand"></span></div>
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <button data-view="match" class="on" data-i="tabMatch"></button>
+      <button data-view="directory" data-i="tabDir"></button>
+      <button data-view="requests"><span data-i="tabReq"></span><span class="count hidden" id="reqCount"></span></button>
+      <button data-view="how" data-i="tabHow"></button>
+    </nav>
+    <span class="status demo" id="status"><i></i><span id="statusTxt"></span></span>
+    <button class="chipbtn" id="langBtn" aria-label="Switch language"></button>
+  </div>
+</div>
+
+<main class="wrap">
+<!-- ================= Match ================= -->
+<section class="view on" id="v-match">
+  <div class="hero">
+    <div class="eyebrow" data-i="heroEyebrow"></div>
+    <h1><span class="grad" data-i="heroH1"></span></h1>
+    <p class="lead" data-i="heroLead"></p>
+  </div>
+  <div class="composer" style="max-width:820px">
+    <label class="hidden" for="ask" data-i="askLabel"></label>
+    <textarea id="ask" maxlength="1200"></textarea>
+    <div class="crow">
+      <button class="icon hidden" id="mic" type="button" title="Voice">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+      <label class="switch" id="deepWrap"><input type="checkbox" id="deep"><span data-i="deep"></span></label>
+      <span class="sp"></span>
+      <button class="btn ghost hidden" id="stopBtn" type="button" data-i="stop"></button>
+      <button class="btn primary" id="runBtn" type="button" data-i="run"></button>
+    </div>
+  </div>
+  <div class="examples" id="examples"></div>
+  <p class="note" id="modeNote"></p>
+
+  <div class="work hidden" id="work">
+    <aside class="panel trace">
+      <h3><span data-i="traceH"></span><span class="tag dash" id="traceMode"></span></h3>
+      <ol class="steps" id="steps"></ol>
+    </aside>
+    <div class="results" id="results"></div>
+  </div>
+</section>
+
+<!-- ================= Directory ================= -->
+<section class="view" id="v-directory">
+  <div class="eyebrow" data-i="dirEyebrow"></div>
+  <h2 style="font-size:32px" data-i="dirH"></h2>
+  <p class="lead" style="margin-top:8px" data-i="dirLead"></p>
+  <div class="filters">
+    <input id="dq" type="search" autocomplete="off">
+    <select id="dkind" aria-label="Type"></select>
+    <select id="dskill" aria-label="Skill"></select>
+    <button class="btn ghost sm" id="joinToggle" data-i="joinBtn"></button>
+  </div>
+  <div class="panel hidden" id="joinPanel" style="margin-bottom:18px">
+    <h3 data-i="joinH"></h3>
+    <p class="note" style="margin-top:4px" data-i="joinNote"></p>
+    <form class="form" id="joinForm">
+      <label><span data-i="fName"></span><input id="jName" required maxlength="40"></label>
+      <label><span data-i="fTitle"></span><input id="jTitle" required maxlength="70"></label>
+      <label><span data-i="fKind"></span><select id="jKind"></select></label>
+      <label><span data-i="fRegion"></span><select id="jRegion"></select></label>
+      <div class="full"><div class="note" style="margin:0 0 6px" data-i="fSkills"></div><div class="pick" id="jSkills"></div></div>
+      <div class="full"><div class="note" style="margin:0 0 6px" data-i="fSectors"></div><div class="pick" id="jSectors"></div></div>
+      <div class="full" style="display:flex;gap:8px"><button class="btn primary sm" type="submit" data-i="joinSave"></button></div>
+    </form>
+  </div>
+  <div class="dir" id="dir"></div>
+</section>
+
+<!-- ================= Requests ================= -->
+<section class="view" id="v-requests">
+  <div class="eyebrow" data-i="reqEyebrow"></div>
+  <h2 style="font-size:32px" data-i="reqH"></h2>
+  <p class="lead" style="margin-top:8px" data-i="reqLead"></p>
+  <div id="reqList" style="display:grid;gap:12px;margin-top:22px"></div>
+</section>
+
+<!-- ================= How it works ================= -->
+<section class="view" id="v-how">
+  <div class="eyebrow" data-i="howEyebrow"></div>
+  <h2 style="font-size:32px" data-i="howH"></h2>
+  <p class="lead" style="margin-top:8px" data-i="howLead"></p>
+  <div class="pipe" id="pipe"></div>
+
+  <div class="sec"><h2 data-i="techH"></h2><p class="lead" data-i="techLead"></p>
+    <div class="tablewrap"><table id="techTable"></table></div></div>
+
+  <div class="sec"><h2 data-i="whyH"></h2><p class="lead" data-i="whyLead"></p>
+    <div class="grid3" id="stats"></div></div>
+
+  <div class="sec"><h2 data-i="raiH"></h2>
+    <div class="grid3" id="rai"></div></div>
+</section>
+</main>
+
+<footer><div class="wrap" data-i="footer"></div></footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* =====================================================================
+   SAM Expert Match: prototype logic.
+   - Live mode: Claude runs as an agent and calls this page's tools
+     (save_analysis, search_directory, propose_matches).
+   - Demo mode: the same flow, driven by transparent local rules.
+   The directory is illustrative sample data. Nothing is sent to real people.
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d } catch { return d } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
+};
+
+/* ---------------- Taxonomy ---------------- */
+const SKILLS = {
+  brand:{ar:'العلامة والهوية',en:'Brand & identity'}, pricing:{ar:'التسعير والمالية',en:'Pricing & finance'},
+  ecom:{ar:'التجارة الإلكترونية',en:'E-commerce'}, marketing:{ar:'التسويق الرقمي',en:'Digital marketing'},
+  photo:{ar:'التصوير والمحتوى المرئي',en:'Photography & visual content'}, product:{ar:'تصميم المنتج والتغليف',en:'Product & packaging design'},
+  craft:{ar:'المهارات الحِرفية',en:'Craft skills'}, curation:{ar:'التقييم الفني والمعارض',en:'Curation & exhibitions'},
+  experience:{ar:'تصميم التجارب الثقافية',en:'Cultural experience design'}, ip:{ar:'الملكية الفكرية',en:'Intellectual property'},
+  licensing:{ar:'التراخيص والتأسيس',en:'Licensing & setup'}, funding:{ar:'التمويل والمنح',en:'Funding & grants'},
+  ops:{ar:'العمليات والإنتاج',en:'Operations & production'}, digital:{ar:'التقنيات الرقمية والرقمنة',en:'Digital tech & digitisation'},
+  heritage:{ar:'البحث والتوثيق التراثي',en:'Heritage research & documentation'}, export:{ar:'التصدير والأسواق',en:'Export & markets'},
+  events:{ar:'إدارة الفعاليات',en:'Event production'}, story:{ar:'السرد القصصي',en:'Storytelling'},
+  production:{ar:'الإنتاج الصوتي والمرئي',en:'Audio & video production'}
+};
+const SECTORS = {
+  crafts:{ar:'الحِرف والتراث',en:'Crafts & heritage'}, fashion:{ar:'الأزياء',en:'Fashion'}, museums:{ar:'المتاحف',en:'Museums'},
+  visual:{ar:'الفنون البصرية',en:'Visual arts'}, culinary:{ar:'فنون الطهي',en:'Culinary arts'}, performing:{ar:'المسرح والفنون الأدائية',en:'Performing arts'},
+  music:{ar:'الموسيقى',en:'Music'}, film:{ar:'الأفلام',en:'Film'}, design:{ar:'العمارة والتصميم',en:'Architecture & design'}, publishing:{ar:'الأدب والنشر',en:'Literature & publishing'}
+};
+const REGIONS = {
+  riyadh:{ar:'الرياض',en:'Riyadh'}, jeddah:{ar:'جدة',en:'Jeddah'}, eastern:{ar:'المنطقة الشرقية',en:'Eastern Province'},
+  alula:{ar:'العلا',en:'AlUla'}, madinah:{ar:'المدينة المنورة',en:'Madinah'}, asir:{ar:'عسير',en:'Asir'}, qassim:{ar:'القصيم',en:'Qassim'}
+};
+const STAGES = { idea:{ar:'فكرة',en:'Idea'}, early:{ar:'بداية النشاط',en:'Just started'}, growing:{ar:'مرحلة النمو',en:'Growing'}, established:{ar:'نشاط قائم',en:'Established'} };
+const MODES = { remote:{ar:'عن بُعد',en:'Remote'}, onsite:{ar:'حضوري',en:'On-site'}, hybrid:{ar:'حضوري وعن بُعد',en:'Hybrid'} };
+const AVAIL = { 3:{ar:'متاح هذا الأسبوع',en:'Available this week'}, 2:{ar:'متاح خلال أسبوعين',en:'Available within 2 weeks'}, 1:{ar:'توفر محدود',en:'Limited availability'} };
+
+/* ---------------- Illustrative directory (fictional profiles) ---------------- */
+const X = (id,ar,en,k,tar,ten,s,c,r,m,a,y,far,fen) => ({id,n:{ar,en},k,t:{ar:tar,en:ten},s,c,r,m,a,y,f:{ar:far,en:fen}});
+const BASE = [
+ X('e01','ريم ح.','Reem H.','expert','مستشارة تسعير ومالية للمشاريع الإبداعية','Pricing & finance adviser for creative businesses',['pricing','funding'],['crafts','fashion','visual'],'riyadh','hybrid',3,9,'عيادة تسعير · جلستان','Pricing clinic · 2 sessions'),
+ X('e02','فيصل ع.','Faisal A.','expert','مختص تجارة إلكترونية للمنتجات الحِرفية','E-commerce specialist for handmade products',['ecom','marketing','ops'],['crafts','fashion','culinary'],'riyadh','remote',2,7,'تأسيس متجر · 4 أسابيع','Store setup · 4 weeks'),
+ X('e03','لمى س.','Lama S.','talent','مصوّرة منتجات ومحتوى مرئي','Product photographer & visual content creator',['photo','story'],['crafts','fashion','culinary'],'riyadh','onsite',3,6,'جلسة تصوير · يوم واحد','Photo shoot · 1 day'),
+ X('e04','عبدالله م.','Abdullah M.','expert','مستشار ملكية فكرية للأعمال الإبداعية','Intellectual property adviser for creative work',['ip','licensing'],['all'],'riyadh','remote',2,11,'استشارة · جلسة واحدة','Consultation · 1 session'),
+ X('e05','هيفاء ق.','Haifa Q.','expert','مستشارة استراتيجية للعلامات الثقافية','Brand strategist for cultural brands',['brand','story','marketing'],['crafts','fashion','museums','design'],'jeddah','hybrid',2,10,'ورشة هوية · 3 جلسات','Brand workshop · 3 sessions'),
+ X('e06','سلطان د.','Sultan D.','talent','مصمم تجارب متحفية وسينوغرافيا','Museum experience & scenography designer',['experience','curation'],['museums','visual'],'eastern','hybrid',2,8,'تصميم تجربة · 6 أسابيع','Experience design · 6 weeks'),
+ X('e07','نوف ب.','Nouf B.','talent','مختصة توثيق رقمي ومسح ثلاثي الأبعاد للمقتنيات','Digital documentation & 3D scanning specialist',['digital','heritage'],['museums','crafts','design'],'eastern','onsite',3,5,'توثيق مجموعة · حسب الحجم','Collection capture · by size'),
+ X('e08','مها ر.','Maha R.','expert','باحثة تراث وتوثيق شفهي','Heritage researcher & oral-history documenter',['heritage','story'],['all'],'asir','remote',2,12,'بحث ميداني · حسب المشروع','Field research · per project'),
+ X('e09','خالد ش.','Khalid S.','expert','مستشار تراخيص وتأسيس للمنشآت الثقافية','Licensing & setup adviser for cultural ventures',['licensing','funding'],['all'],'riyadh','remote',3,8,'استشارة · جلستان','Advisory · 2 sessions'),
+ X('e10','جواهر ن.','Jawaher N.','talent','حِرفية ومدرّبة سدو ونسيج تقليدي','Sadu weaver & traditional textile trainer',['craft','product'],['crafts','fashion'],'qassim','onsite',2,15,'تدريب عملي · 5 أيام','Hands-on training · 5 days'),
+ X('e11','تركي ف.','Turki F.','talent','مطرّز يدوي ومشرف إنتاج أزياء','Hand embroiderer & fashion production lead',['craft','ops'],['fashion'],'jeddah','onsite',2,13,'إنتاج بالطلب · حسب الكمية','Made to order · by quantity'),
+ X('e12','دانة ك.','Dana K.','expert','مستشارة تصدير وأسواق خليجية','Export & Gulf markets adviser',['export','ops','pricing'],['fashion','crafts','culinary'],'jeddah','remote',2,9,'خطة دخول سوق · 3 جلسات','Market entry plan · 3 sessions'),
+ X('e13','يوسف ط.','Yousef T.','talent','مصمم منتجات وتغليف','Product & packaging designer',['product','brand'],['crafts','culinary','design'],'riyadh','hybrid',3,7,'تصميم تغليف · 3 أسابيع','Packaging design · 3 weeks'),
+ X('e14','سارة ج.','Sarah J.','expert','قيّمة فنية ومستشارة معارض','Curator & exhibitions adviser',['curation','events'],['visual','museums'],'riyadh','hybrid',1,10,'تقييم معرض · حسب المشروع','Exhibition curation · per project'),
+ X('e15','ماجد ل.','Majed L.','talent','مطوّر تجارب واقع معزز وجولات رقمية','AR experience & digital tour developer',['digital','experience'],['museums','design','performing'],'riyadh','remote',2,6,'نموذج تجربة · 4 أسابيع','Experience prototype · 4 weeks'),
+ X('e16','العنود ص.','Alanoud S.','expert','مختصة منح وتمويل ثقافي','Cultural grants & funding specialist',['funding'],['all'],'riyadh','remote',3,7,'مراجعة طلب تمويل · جلستان','Funding application review · 2 sessions'),
+ X('e17','بدر ي.','Bader Y.','talent','منتج فعاليات وعروض أدائية','Event & live performance producer',['events','ops'],['performing','music','culinary'],'jeddah','onsite',2,9,'إنتاج فعالية · حسب الحجم','Event production · by scale'),
+ X('e18','غادة و.','Ghada W.','expert','مختصة تسويق رقمي وصناعة محتوى ثقافي','Digital marketing & cultural content specialist',['marketing','story'],['all'],'eastern','remote',3,6,'خطة محتوى · شهر','Content plan · 1 month'),
+ X('e19','راكان ز.','Rakan Z.','talent','مهندس صوت وتسجيل موسيقي','Sound engineer & music recordist',['production'],['music','performing','film'],'riyadh','onsite',2,8,'تسجيل · باليوم','Recording · per day'),
+ X('e20','شهد أ.','Shahad A.','talent','صانعة أفلام قصيرة ووثائقية','Short film & documentary maker',['production','photo','story'],['film','crafts','museums'],'alula','onsite',2,5,'فيلم تعريفي · أسبوعان','Brand film · 2 weeks'),
+ X('e21','إبراهيم خ.','Ibrahim K.','expert','مستشار عمليات وسلاسل إمداد للمنتجات اليدوية','Operations & supply-chain adviser for handmade goods',['ops','pricing'],['crafts','culinary','fashion'],'qassim','remote',2,12,'إرشاد شهري','Monthly mentoring'),
+ X('e22','ليان ث.','Layan T.','talent','خزّافة ومدرّبة فخار','Ceramicist & pottery trainer',['craft','product'],['crafts','design'],'madinah','onsite',3,8,'ورشة عملية · 3 أيام','Hands-on workshop · 3 days'),
+ X('e23','منصور غ.','Mansour G.','expert','مصمم جولات وتجارب سياحية ثقافية','Cultural tour & visitor experience designer',['experience','heritage','events'],['museums','design','culinary'],'alula','hybrid',2,9,'تصميم جولة · 3 أسابيع','Tour design · 3 weeks'),
+ X('e24','أسيل هـ.','Aseel H.','expert','محررة ومستشارة نشر ثقافي','Editor & cultural publishing adviser',['story','ip'],['publishing','visual'],'jeddah','remote',2,8,'مراجعة مخطوطة · حسب الطول','Manuscript review · by length')
+];
+let extra = store.get('sam_extra', []);
+const allExperts = () => BASE.concat(extra);
+const byId = id => allExperts().find(e => e.id === id);
+
+/* ---------------- Copy (Arabic first, English toggle) ---------------- */
+const I = {
+ar:{
+ brand:'مطابقة الخبرات', tabMatch:'المطابقة', tabDir:'دليل الخبرات', tabReq:'طلباتي', tabHow:'كيف يعمل',
+ live:'Claude متصل', demo:'وضع تجريبي', langBtn:'English',
+ heroEyebrow:'وكيل ذكي لروّاد الأعمال الثقافية', heroH1:'سَمّ، وش بغيت؟',
+ heroLead:'اكتب عن مشروعك الثقافي بكلماتك. وكيل SAM يحلّل احتياجك، يبحث في دليل الخبرات، ويرشّح لك الخبراء والكفاءات الفنية المناسبة مع سبب كل ترشيح.',
+ askLabel:'وصف المشروع', askPh:'مثال: أنسج قطع السدو وأبيعها عبر الرسائل، وأبغى أسعّر صح وأفتح متجر إلكتروني…',
+ deep:'تحليل أعمق (أبطأ)', run:'حلّل ورشّح', stop:'إيقاف', running:'الوكيل يعمل…',
+ noteLive:'التحليل والترشيحات من Claude مباشرة. ملفات الخبراء في الدليل توضيحية.',
+ noteDemo:'الوضع التجريبي: التحليل هنا بقواعد محلية داخل الصفحة. افتح الصفحة داخل Claude لتشغيل الوكيل الحي.',
+ exLabel:['حِرف','متحف','أزياء'],
+ ex:['أنسج قطع السدو وأبيعها عبر الرسائل في الرياض. أبغى أسعّر صح، وأفتح متجر إلكتروني، وأصوّر منتجاتي بشكل احترافي.',
+     'عندي متحف خاص صغير في الأحساء. أبغى أصمم تجربة زيارة تفاعلية، وأوثّق المقتنيات رقميًا، وأعرف وش التراخيص المطلوبة.',
+     'علامة أزياء في جدة مستوحاة من الأزياء التقليدية. نبغى نحمي تصاميمنا، ونوصل لأسواق الخليج، ونلقى مطرّزين متمكنين من الشغل اليدوي.'],
+ traceH:'مسار الوكيل', traceLive:'Claude', traceDemo:'قواعد محلية',
+ steps:['فهم المشروع','تشخيص الاحتياجات','البحث في دليل الخبرات','الترتيب وتفسير الترشيح','الخلاصة'],
+ briefTag:'ملخص المشروع', needsH:'الاحتياجات التي شخّصها الوكيل', needsHint:'اختر احتياجًا لعرض ترشيحاته',
+ prio:['','أولوية عالية','أولوية متوسطة','أولوية لاحقة'],
+ matchesFor:'الترشيحات لاحتياج', matchCount:n=>`${n} ترشيح`, expert:'خبير', talent:'كفاءة فنية', any:'الكل',
+ why:'لماذا هذا الترشيح', watch:'انتبه', years:y=>`${y} سنة خبرة`, illus:'ملف توضيحي',
+ fitSkill:'تطابق الخبرة', fitSector:'معرفة القطاع', fitPrac:'الموقع والتوفر',
+ scoreNote:'الدرجة محسوبة بقاعدة ثابتة: 50% خبرة، 30% قطاع، 20% موقع وتوفر.',
+ intro:'اطلب تعارف 20 دقيقة', notFit:'ليس مناسبًا', alt:'ترشيح بديل', requested:'✓ تم الطلب',
+ noMore:'لا توجد ترشيحات أخرى لهذا الاحتياج في الدليل الحالي.',
+ fallback:'تعذّر إكمال التحليل الحي، فأُكملت النتائج بالقواعد المحلية.', stopped:'تم إيقاف الوكيل.',
+ emptyAsk:'اكتب وصفًا قصيرًا لمشروعك أولًا.',
+ localSummary:(n,m)=>`شخّصتُ ${n} احتياجات ورشّحت ${m} ملفات من الدليل. ابدأ بالاحتياج الأعلى أولوية واطلب جلسة تعارف قصيرة.`,
+ localWhy:(y,sk,sec)=>`خبرة ${y} سنة في ${sk}، مع عمل سابق في ${sec}.`,
+ localNeedWhy:sk=>`ذكرتَ في وصفك ما يدل على حاجة في ${sk}.`,
+ wRegion:r=>`يعمل حضوريًا في ${r}، وقد تكون خارج منطقتك.`, wAvail:'التوفر محدود حاليًا.', wSector:'خبرته الأساسية في قطاعات أخرى.',
+ dirEyebrow:'قاعدة المعرفة التي يبحث فيها الوكيل', dirH:'دليل الخبرات والكفاءات الفنية',
+ dirLead:'هذه هي الملفات التي يسترجع منها الوكيل ترشيحاته. جميعها ملفات توضيحية لأغراض العرض وليست أشخاصًا حقيقيين.',
+ dq:'ابحث بالاسم أو التخصص…', allKinds:'كل الأنواع', allSkills:'كل التخصصات',
+ joinBtn:'+ أضف ملفًا', joinH:'أضف ملف خبير أو كفاءة فنية', joinNote:'يُحفظ في هذا المتصفح فقط، ويصبح قابلًا للبحث من الوكيل مباشرة.',
+ fName:'الاسم', fTitle:'المسمّى أو التخصص', fKind:'النوع', fRegion:'المنطقة', fSkills:'مجالات الخبرة (اختر حتى 3)', fSectors:'القطاعات (اختر حتى 3)',
+ joinSave:'حفظ الملف', joinNeed:'اختر مجال خبرة واحدًا على الأقل.', joined:'أُضيف الملف إلى الدليل.', added:'أُضيف من هذا المتصفح', remove:'حذف',
+ reqEyebrow:'متابعة', reqH:'طلبات التعارف', reqLead:'الطلبات المحفوظة في هذا المتصفح. في النموذج الأولي لا تُرسل أي رسالة فعلية.',
+ reqEmpty:'لا توجد طلبات بعد. شغّل المطابقة واطلب تعارفًا مع أحد المرشحين.', reqStatus:'محفوظ · لم يُرسل (نموذج أولي)', forNeed:'الاحتياج',
+ dH:'طلب تعارف مع', dLead:'صاغ الوكيل رسالة تعريفية يمكنك تعديلها قبل الحفظ.', dMsg:'رسالة التعريف', dAgenda:'أسئلة مقترحة للجلسة الأولى',
+ dSave:'حفظ الطلب', dCopy:'نسخ الرسالة', dClose:'إغلاق', drafting:'يصوغ الوكيل الرسالة…', copied:'نُسخت الرسالة.', saved:'حُفظ الطلب في «طلباتي».',
+ dNote:'لن تُرسل الرسالة لأي شخص. هذا نموذج أولي.',
+ tplMsg:(name,title,need,proj)=>`مرحبًا ${name}،\n\nأعمل على مشروع ثقافي: ${proj}\n\nأبحث عن دعم في «${need}»، ورشّحك وكيل SAM بناءً على خبرتك (${title}).\n\nهل يناسبك لقاء تعارف لمدة 20 دقيقة هذا الأسبوع لأشرح الاحتياج ونرى إن كان هناك مجال للتعاون؟\n\nشكرًا لك.`,
+ tplAgenda:need=>[`ما أول خطوة تنصح بها في «${need}» لمشروع بحجمي؟`,'ما المعلومات التي تحتاجها مني قبل البدء؟','كيف يبدو شكل التعاون المعتاد معك ومدته؟'],
+ howEyebrow:'تحت الغطاء', howH:'كيف يعمل وكيل SAM',
+ howLead:'الوكيل لا يجيب دفعة واحدة. ينفّذ خطوات متتابعة ويستدعي أدوات، وكل خطوة تظهر لك في «مسار الوكيل».',
+ pipe:[['01','تستقبل','وصف حر بالكتابة أو الصوت، بالعربية أو الإنجليزية.',''],['02','تحلّل','النموذج اللغوي يستخرج ملخص المشروع واحتياجاته.','save_analysis'],['03','تسترجع','بحث في دليل الخبرات لكل احتياج.','search_directory'],['04','ترشّح وتفسّر','اختيار الأنسب من نتائج البحث فقط، مع السبب والتنبيه.','propose_matches'],['05','تربط','صياغة رسالة تعارف، والقرار لصاحب المشروع.','']],
+ techH:'التقنيات المستخدمة', techLead:'ما يعمل فعلًا في هذا النموذج، وما نخطط له في المنتج.',
+ techHead:['الطبقة','في هذا النموذج الأولي','في المنتج'],
+ tech:[['الواجهة','HTML و CSS و JavaScript في صفحة واحدة','واجهة ويب متجاوبة بالعربية والإنجليزية'],['النموذج اللغوي (LLM)','Claude، يُستدعى من الصفحة مباشرة','Claude عبر API من خادم المنصة'],['الوكيل','Claude يستدعي أدوات الصفحة (tool use) على عدة جولات','وكيل بأدوات إضافية: حجز، متابعة، تذكير'],['الاسترجاع (RAG)','بحث بالوسوم والقواعد في دليل داخل الصفحة','تضمينات نصية وقاعدة بيانات متجهة للبحث الدلالي'],['الخادم والبيانات','لا يوجد خادم. الحفظ في المتصفح','Python و API وقاعدة بيانات لملفات الخبراء'],['درجة التطابق','قاعدة ثابتة شفافة تُحسب في الصفحة','القاعدة نفسها، تُراجع ببيانات نتائج التعاون']],
+ whyH:'لماذا الآن', whyLead:'أرقام منشورة عن القطاع الثقافي في المملكة.',
+ stats:[['283K','عامل وعاملة في المهن الثقافية خلال 2025، بنمو 8%.','وزارة الثقافة، تقرير الحالة الثقافية 2025 (عكاظ)','https://www.okaz.com.sa/local/na/2270369'],['3%','مستهدف مساهمة القطاع الثقافي في الناتج المحلي بحلول 2030، أي 180 مليار ريال.','وزير الثقافة (Arab News)','https://www.arabnews.com/node/2605398/business-economy'],['شراكة','مذكرة تفاهم بين وزارة الثقافة و«منشآت» لتمكين روّاد الأعمال الثقافيين بالتدريب والاستشارات.','الشرق الأوسط','https://english.aawsat.com/culture/5078936-saudi-culture-commerce-ministers-sign-mou-empower-entrepreneurs-cultural-sector']],
+ raiH:'ذكاء اصطناعي مسؤول',
+ rai:[['القرار للإنسان','الوكيل يرشّح ويفسّر، وصاحب المشروع يقرّر. يمكن رفض أي ترشيح وطلب بديل.'],['لا اختلاق','الوكيل يختار من نتائج البحث فقط، والصفحة ترفض أي ملف غير موجود في الدليل.'],['شفافية','كل ترشيح معه سبب وتنبيه ودرجة مفصّلة. الملفات الحالية توضيحية ولا تُرسل رسائل فعلية.']],
+ footer:'SAM · نموذج أولي لهاكاثون AgentX، مسار الثقافة والتراث. ملفات الخبراء توضيحية.',
+ source:'المصدر'
+},
+en:{
+ brand:'Expert Match', tabMatch:'Match', tabDir:'Directory', tabReq:'My requests', tabHow:'How it works',
+ live:'Claude connected', demo:'Demo mode', langBtn:'العربية',
+ heroEyebrow:'An AI agent for cultural entrepreneurs', heroH1:'Tell SAM what you need.',
+ heroLead:'Describe your cultural project in your own words. SAM analyses what you need, searches the talent directory, and recommends the right experts and technical talent, with a reason for every match.',
+ askLabel:'Project description', askPh:'e.g. I weave Sadu pieces and sell through DMs. I want to price properly and open an online store…',
+ deep:'Deeper analysis (slower)', run:'Analyse & match', stop:'Stop', running:'Agent working…',
+ noteLive:'Analysis and recommendations come from Claude, live. Directory profiles are illustrative.',
+ noteDemo:'Demo mode: analysis here uses local rules inside the page. Open the page inside Claude to run the live agent.',
+ exLabel:['Crafts','Museum','Fashion'],
+ ex:['I weave Sadu pieces and sell through DMs in Riyadh. I want to price them properly, open an online store, and get professional product photos.',
+     'I run a small private museum in Al-Ahsa. I want an interactive visitor experience, a digital record of the collection, and to know which licences I need.',
+     'We are a Jeddah fashion label inspired by traditional dress. We want to protect our designs, reach Gulf markets, and find skilled hand embroiderers.'],
+ traceH:'Agent trace', traceLive:'Claude', traceDemo:'Local rules',
+ steps:['Understand the project','Diagnose needs','Search the directory','Rank & explain','Summary'],
+ briefTag:'Project brief', needsH:'Needs the agent diagnosed', needsHint:'Pick a need to see its matches',
+ prio:['','High priority','Medium priority','Later'],
+ matchesFor:'Matches for', matchCount:n=>`${n} match${n===1?'':'es'}`, expert:'Expert', talent:'Technical talent', any:'All',
+ why:'Why this match', watch:'Watch out', years:y=>`${y} yrs experience`, illus:'Illustrative profile',
+ fitSkill:'Expertise fit', fitSector:'Sector knowledge', fitPrac:'Location & availability',
+ scoreNote:'Score uses a fixed rule: 50% expertise, 30% sector, 20% location and availability.',
+ intro:'Request a 20-min intro', notFit:'Not a fit', alt:'Alternative', requested:'✓ Requested',
+ noMore:'No other candidates for this need in the current directory.',
+ fallback:'The live analysis could not finish, so results were completed with local rules.', stopped:'Agent stopped.',
+ emptyAsk:'Write a short description of your project first.',
+ localSummary:(n,m)=>`I found ${n} needs and matched ${m} profiles from the directory. Start with the highest-priority need and request a short intro.`,
+ localWhy:(y,sk,sec)=>`${y} years in ${sk}, with previous work in ${sec}.`,
+ localNeedWhy:sk=>`Your description points to a need in ${sk}.`,
+ wRegion:r=>`Works on-site in ${r}, which may be outside your region.`, wAvail:'Limited availability right now.', wSector:'Main experience is in other sectors.',
+ dirEyebrow:'The knowledge base the agent searches', dirH:'Expert & talent directory',
+ dirLead:'These are the profiles the agent retrieves from. All are illustrative demonstration profiles, not real people.',
+ dq:'Search by name or specialty…', allKinds:'All types', allSkills:'All specialties',
+ joinBtn:'+ Add a profile', joinH:'Add an expert or talent profile', joinNote:'Saved in this browser only, and searchable by the agent straight away.',
+ fName:'Name', fTitle:'Title or specialty', fKind:'Type', fRegion:'Region', fSkills:'Areas of expertise (up to 3)', fSectors:'Sectors (up to 3)',
+ joinSave:'Save profile', joinNeed:'Pick at least one area of expertise.', joined:'Profile added to the directory.', added:'Added in this browser', remove:'Remove',
+ reqEyebrow:'Follow-up', reqH:'Intro requests', reqLead:'Requests saved in this browser. In the prototype no message is actually sent.',
+ reqEmpty:'No requests yet. Run a match and request an intro with a candidate.', reqStatus:'Saved · not sent (prototype)', forNeed:'Need',
+ dH:'Intro request to', dLead:'The agent drafted an intro message. Edit it before saving.', dMsg:'Intro message', dAgenda:'Suggested questions for the first session',
+ dSave:'Save request', dCopy:'Copy message', dClose:'Close', drafting:'Drafting the message…', copied:'Message copied.', saved:'Request saved to My requests.',
+ dNote:'The message is not sent to anyone. This is a prototype.',
+ tplMsg:(name,title,need,proj)=>`Hello ${name},\n\nI'm working on a cultural project: ${proj}\n\nI'm looking for support with "${need}", and SAM suggested you based on your experience (${title}).\n\nWould a 20-minute intro call this week work, so I can explain the need and we can see if there's a fit?\n\nThank you.`,
+ tplAgenda:need=>[`What first step would you recommend on "${need}" for a project my size?`,'What do you need from me before we start?','What does working with you usually look like, and how long does it take?'],
+ howEyebrow:'Under the hood', howH:'How the SAM agent works',
+ howLead:'The agent does not answer in one shot. It works through steps and calls tools, and every step shows up in the agent trace.',
+ pipe:[['01','Intake','Free text, typed or spoken, in Arabic or English.',''],['02','Analyse','The language model extracts a project brief and its needs.','save_analysis'],['03','Retrieve','A directory search for every need.','search_directory'],['04','Rank & explain','Picks only from search results, with a reason and a caution.','propose_matches'],['05','Connect','Drafts an intro message. The entrepreneur decides.','']],
+ techH:'Technologies used', techLead:'What actually runs in this prototype, and what we plan for the product.',
+ techHead:['Layer','In this prototype','In the product'],
+ tech:[['Interface','HTML, CSS and JavaScript in one page','Responsive web app in Arabic and English'],['Language model (LLM)','Claude, called directly from the page','Claude through the API from the platform server'],['Agent','Claude calls the page\'s tools over several rounds','Agent with more tools: booking, follow-up, reminders'],['Retrieval (RAG)','Tag and rule search over an in-page directory','Text embeddings and a vector database for semantic search'],['Server & data','No server. Saved in the browser','Python, an API and a database of expert profiles'],['Match score','A fixed, transparent rule computed in the page','Same rule, reviewed against collaboration outcomes']],
+ whyH:'Why now', whyLead:'Published figures on the Kingdom\'s cultural sector.',
+ stats:[['283K','people working in cultural professions in 2025, up 8%.','Ministry of Culture, State of Culture Report 2025 (Okaz)','https://www.okaz.com.sa/local/na/2270369'],['3%','target share of GDP for the cultural sector by 2030, or SR180 billion.','Minister of Culture (Arab News)','https://www.arabnews.com/node/2605398/business-economy'],['MoU','between the Ministry of Culture and Monsha\'at to support cultural entrepreneurs with training and consulting.','Asharq Al-Awsat','https://english.aawsat.com/culture/5078936-saudi-culture-commerce-ministers-sign-mou-empower-entrepreneurs-cultural-sector']],
+ raiH:'Responsible AI',
+ rai:[['The human decides','The agent recommends and explains. The entrepreneur decides, and can reject any match and ask for another.'],['No invention','The agent picks only from search results, and the page rejects any profile that is not in the directory.'],['Transparency','Every match carries a reason, a caution and a score breakdown. Current profiles are illustrative and no message is sent.']],
+ footer:'SAM · prototype for the AgentX hackathon, Culture & Heritage track. Expert profiles are illustrative.',
+ source:'Source'
+}};
+let lang = store.get('sam_lang', 'ar');
+const T = () => I[lang];
+const L = o => o ? (o[lang] ?? o.ar ?? o.en ?? '') : '';
+
+/* ---------------- State ---------------- */
+const freshRun = () => ({brief:null, needs:[], pool:{}, matches:[], dismissed:{}, summary:'', banner:'', active:null, steps:[0,1,2,3,4].map(()=>({s:'idle',logs:[]}))});
+let R = freshRun(), running = false, ctl = null, ai = null, dict = null, toolsOK = true;
+let requests = store.get('sam_requests', []);
+
+/* ---------------- Retrieval and scoring (deterministic, explainable) ---------------- */
+function fit(e, need, brief){
+  const alt = need.alt || [];
+  const sk = e.s.includes(need.skill) ? 100 : alt.some(x => e.s.includes(x)) ? 65 : 20;
+  const sec = e.c.includes(brief.sector) ? 100 : e.c.includes('all') ? 80 : 40;
+  const near = e.r === brief.region;
+  const reg = e.m === 'onsite' ? (near ? 100 : brief.region === 'unknown' ? 70 : 45) : (near ? 100 : 85);
+  const prac = Math.round(reg * .6 + ({1:55,2:80,3:100}[e.a] || 70) * .4);
+  let total = Math.round(.5*sk + .3*sec + .2*prac);
+  if (need.kind && need.kind !== 'any' && need.kind !== e.k) total -= 5;
+  return {sk, sec, prac, total: Math.max(0, total)};
+}
+function retrieve(need, brief){
+  return allExperts().map(e => ({e, f: fit(e, need, brief)})).filter(x => x.f.sk >= 65).sort((a,b) => b.f.total - a.f.total);
+}
+function localWatch(e, brief){
+  if (e.m === 'onsite' && e.r !== brief.region) return T().wRegion(L(REGIONS[e.r]));
+  if (e.a === 1) return T().wAvail;
+  if (!e.c.includes(brief.sector) && !e.c.includes('all')) return T().wSector;
+  return '';
+}
+const localWhy = (e, need, brief) => T().localWhy(e.y, L(SKILLS[need.skill]), L(SECTORS[e.c.includes(brief.sector) ? brief.sector : e.c[0]]) || L(SECTORS[brief.sector]));
+
+/* ---------------- Local rule engine (demo mode and safety net) ---------------- */
+const KW = {
+ pricing:['سعر','تسعير','أسعّر','اسعر','تكلف','pric','cost'], ecom:['متجر','إلكترون','الكترون','أونلاين','اونلاين','online','store','shop','e-comm'],
+ photo:['تصوير','أصوّر','اصور','صور احتراف','photo','shoot'], brand:['هوية','علامة تجارية','شعار','brand','logo'],
+ marketing:['تسويق','انستقرام','محتوى','marketing','social','customers'], ip:['أحمي','احمي','نحمي','حماية','ملكية','حقوق','protect','copyright','trademark'],
+ licensing:['ترخيص','تراخيص','رخصة','تأسيس','سجل تجاري','licen','permit'], funding:['تمويل','منحة','منح','fund','grant','invest'],
+ ops:['توريد','مورد','مخزون','سلسلة','supply','inventory','logistic'], digital:['رقمي','رقمن','ثلاثي','واقع معزز','تطبيق','digit','3d','augmented'],
+ heritage:['أوثّق','اوثق','توثيق','يوثق','تاريخ شفهي','document','archive','record of'], export:['تصدير','الخليج','دولي','export','gulf','international'],
+ events:['فعالية','مهرجان','عرض حي','event','festival'], experience:['تجربة','زيارة','جولة','تفاعلي','experience','tour','visitor','interactive'],
+ craft:['خياط','تطريز','مطرّز','مطرز','حرفي','نسّاج','مدرب','فخار','tailor','embroider','artisan','weaver','potter'],
+ curation:['قيّم','تنسيق معرض','curat','exhibition'], product:['تغليف','تصميم منتج','packag','product design'],
+ production:['تسجيل','مونتاج','فيلم','audio','recording','film','video'], story:['قصة','سرد','حكاية','story','narrative']
+};
+const SECKW = { crafts:['سدو','حرف','فخار','نسيج','خوص','sadu','craft','potter','weav'], fashion:['أزياء','ازياء','عباي','تطريز','fashion','label','dress'], museums:['متحف','مقتنيات','museum','collection'],
+ visual:['لوحات','فن تشكيلي','معرض فني','gallery','painting'], culinary:['مطعم','طهي','أكلات','مأكولات','قهوة','food','culinary','coffee'], performing:['مسرح','فرقة','عرض أدائي','theat','performance'],
+ music:['موسيقى','عود','أغاني','music'], film:['فيلم','أفلام','سينما','film','cinema'], design:['عمارة','تصميم داخلي','architect','interior'], publishing:['كتاب','نشر','رواية','book','publish'] };
+const REGKW = { riyadh:['الرياض','riyadh'], jeddah:['جدة','جده','jeddah'], eastern:['الأحساء','الاحساء','الدمام','الخبر','الشرقية','ahsa','dammam','khobar','eastern'], alula:['العلا','alula'], madinah:['المدينة','madinah','medina'], asir:['أبها','ابها','عسير','abha','asir'], qassim:['القصيم','بريدة','qassim','buraydah'] };
+const KIND = {craft:'talent', photo:'talent', production:'talent', digital:'talent', product:'talent', experience:'talent'};
+function localAnalyse(text){
+  const t = text.toLowerCase();
+  const first = (map) => Object.entries(map).map(([k, ws]) => [k, Math.min(...ws.map(w => { const i = t.indexOf(w); return i < 0 ? 1e9 : i }))]).filter(x => x[1] < 1e9).sort((a,b) => a[1]-b[1]).map(x => x[0]);
+  let skills = first(KW).slice(0, 4);
+  if (!skills.length) skills = ['brand','marketing'];
+  const sector = first(SECKW)[0] || 'crafts', region = first(REGKW)[0] || 'unknown';
+  const short = text.trim().replace(/\s+/g,' ');
+  return {
+    brief:{title:L(SECTORS[sector]), summary: short.length > 190 ? short.slice(0,190) + '…' : short, sector, stage:'early', region},
+    needs: skills.map((s,i) => ({id:'n'+(i+1), skill:s, title:L(SKILLS[s]), why:T().localNeedWhy(L(SKILLS[s])), priority:Math.min(3, i+1), kind:KIND[s] || 'expert'}))
+  };
+}
+/* Fill anything the live run left missing, so the screen is always complete. */
+function complete(text){
+  if (!R.brief || !R.needs.length){ const a = localAnalyse(text); R.brief = R.brief || a.brief; if (!R.needs.length) R.needs = a.needs; }
+  for (const n of R.needs){
+    if (!R.pool[n.id]) R.pool[n.id] = retrieve(n, R.brief).map(x => x.e.id);
+    const have = R.matches.filter(m => m.need_id === n.id).length;
+    for (const id of R.pool[n.id]){
+      if (R.matches.filter(m => m.need_id === n.id).length >= Math.max(2, have)) break;
+      if (R.matches.some(m => m.need_id === n.id && m.expert_id === id)) continue;
+      const e = byId(id); R.matches.push({need_id:n.id, expert_id:id, why:localWhy(e, n, R.brief), watch:localWatch(e, R.brief)});
+    }
+  }
+  if (!R.summary) R.summary = T().localSummary(R.needs.length, R.matches.length);
+  R.active = R.active || R.needs[0]?.id;
+}
+
+/* ---------------- Agent trace ---------------- */
+function step(i, s){ R.steps[i].s = s; renderTrace() }
+function log(i, html){ R.steps[i].logs.push(html); renderTrace() }
+function renderTrace(){
+  $('steps').innerHTML = R.steps.map((st,i) => `<li class="stepi ${st.s}"><span class="dot"></span><b>${esc(T().steps[i])}</b>${st.logs.length ? `<div class="logs">${st.logs.map(l => `<div class="log">${l}</div>`).join('')}</div>` : ''}</li>`).join('');
+  $('traceMode').textContent = ai && !R.forceDemo ? T().traceLive : T().traceDemo;
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------------- Demo run (local rules, paced so the steps are readable) ---------------- */
+async function runLocal(text){
+  R.forceDemo = true;
+  step(0,'run'); await wait(500);
+  const a = localAnalyse(text); R.brief = a.brief;
+  log(0, `<em>analyse</em>(text) → sector: <span>${a.brief.sector}</span>, region: <span>${a.brief.region}</span>`);
+  step(0,'done'); renderResults(); step(1,'run'); await wait(600);
+  R.needs = a.needs; R.active = a.needs[0].id;
+  log(1, `needs → <span>${a.needs.map(n => n.skill).join(', ')}</span>`);
+  step(1,'done'); renderResults(); step(2,'run');
+  for (const n of R.needs){ await wait(380); const res = retrieve(n, R.brief); R.pool[n.id] = res.map(x => x.e.id); log(2, `<em>search_directory</em>({skill:"${n.skill}"}) → <span>${res.length} candidates</span>`) }
+  step(2,'done'); step(3,'run'); await wait(550);
+  complete(text); log(3, `<em>propose_matches</em> → <span>${R.matches.length} saved</span>`);
+  step(3,'done'); step(4,'done'); renderResults();
+}
+
+/* ---------------- Live run: Claude as an agent calling page tools ---------------- */
+function agentPrompt(text){
+  const list = o => Object.entries(o).map(([k,v]) => `${k} = ${v.en}`).join('; ');
+  return `You are SAM, an agent that helps cultural entrepreneurs in Saudi Arabia reach the right experts and technical talent.
+
+Work in this exact order, using the tools:
+1. Call save_analysis once: a short brief of the project and 2 to 4 distinct needs, most important first. Each need maps to exactly one skill key.
+2. Call search_directory once for every need (you may call them together in one round).
+3. Call propose_matches once: for each need choose the 2 best candidates FROM ITS SEARCH RESULTS ONLY, using their ids exactly. "why" must be specific: tie the entrepreneur's own words to that candidate's profile. "watch_out" is one honest limitation (region, availability, sector fit) or "" if there is none.
+4. Then write a 2-sentence summary addressed to the entrepreneur. Write no other text before this.
+
+Rules: write every text field and the summary in ${lang === 'ar' ? 'Arabic' : 'English'}. Never invent an expert. Keep each text field under 200 characters. If the message is not about a cultural project, do your best and say so in the summary.
+
+Skill keys: ${list(SKILLS)}
+Sector keys: ${list(SECTORS)}
+Stage keys: ${list(STAGES)}
+Region keys: ${list(REGIONS)}; unknown = not stated
+
+Entrepreneur's message:
+"""${text.slice(0, 1200)}"""`;
+}
+function buildTools(){
+  const SK = Object.keys(SKILLS);
+  return [
+   { name:'save_analysis',
+     description:'Save the project brief and the 2-4 needs you diagnosed. Call first, exactly once. Returns the saved needs with the ids to use in later calls.',
+     inputSchema:{type:'object',required:['title','summary','sector','needs'],properties:{
+       title:{type:'string',description:'Short project name'}, summary:{type:'string'}, sector:{type:'string',enum:Object.keys(SECTORS)},
+       stage:{type:'string',enum:Object.keys(STAGES)}, region:{type:'string',enum:Object.keys(REGIONS).concat('unknown')},
+       needs:{type:'array',items:{type:'object',required:['skill','title','why','priority'],properties:{
+         skill:{type:'string',enum:SK}, title:{type:'string'}, why:{type:'string',description:'Why the project needs this, from their words'},
+         priority:{type:'integer',enum:[1,2,3]}, kind:{type:'string',enum:['expert','talent','any'],description:'expert = adviser; talent = hands-on technical or artistic skill'}}}}}},
+     execute(inp){
+       const needs = (Array.isArray(inp.needs) ? inp.needs : []).filter(n => n && SKILLS[n.skill]).slice(0,4)
+         .map((n,i) => ({id:'n'+(i+1), skill:n.skill, title:String(n.title || L(SKILLS[n.skill])).slice(0,80), why:String(n.why || '').slice(0,260), priority:[1,2,3].includes(+n.priority) ? +n.priority : 2, kind:['expert','talent'].includes(n.kind) ? n.kind : 'any'}));
+       if (!needs.length) throw new Error('No valid needs. Each need.skill must be one of the skill keys.');
+       R.brief = {title:String(inp.title || '').slice(0,80), summary:String(inp.summary || '').slice(0,320), sector:SECTORS[inp.sector] ? inp.sector : 'crafts', stage:STAGES[inp.stage] ? inp.stage : 'early', region:REGIONS[inp.region] ? inp.region : 'unknown'};
+       R.needs = needs; R.active = needs[0].id;
+       log(0, `<em>save_analysis</em> → sector: <span>${R.brief.sector}</span>, stage: <span>${R.brief.stage}</span>`);
+       log(1, `needs → <span>${needs.map(n => n.skill).join(', ')}</span>`);
+       R.steps[0].s = 'done'; R.steps[1].s = 'done'; step(2,'run'); renderResults();
+       return {needs: needs.map(n => ({need_id:n.id, skill:n.skill}))};
+     }},
+   { name:'search_directory',
+     description:'Search the expert and talent directory for one need. Returns up to 5 candidates (id, name, title, skills, sectors, region, mode, availability, years, fit score). Call once per need_id.',
+     inputSchema:{type:'object',required:['need_id'],properties:{need_id:{type:'string'}, related_skills:{type:'array',items:{type:'string',enum:SK},description:'Optional adjacent skills to widen the search'}}},
+     execute(inp){
+       const need = R.needs.find(n => n.id === String(inp.need_id));
+       if (!need) throw new Error('Unknown need_id. Use an id returned by save_analysis.');
+       need.alt = (Array.isArray(inp.related_skills) ? inp.related_skills : []).filter(s => SKILLS[s] && s !== need.skill).slice(0,3);
+       const res = retrieve(need, R.brief); R.pool[need.id] = res.map(x => x.e.id);
+       log(2, `<em>search_directory</em>({need:"${need.skill}"${need.alt.length ? `, related:[${need.alt.join(',')}]` : ''}}) → <span>${res.length} candidates</span>`);
+       return {need_id:need.id, candidates: res.slice(0,5).map(({e,f}) => ({id:e.id, name:L(e.n), type:e.k, title:L(e.t), skills:e.s, sectors:e.c, region:e.r, mode:e.m, availability:L(AVAIL[e.a]), years:e.y, fit:f.total}))};
+     }},
+   { name:'propose_matches',
+     description:'Save your final recommendations. Call once, after all searches. Returns how many were saved and any that were rejected.',
+     inputSchema:{type:'object',required:['matches'],properties:{matches:{type:'array',items:{type:'object',required:['need_id','expert_id','why'],properties:{need_id:{type:'string'},expert_id:{type:'string'},why:{type:'string'},watch_out:{type:'string'}}}}}},
+     execute(inp){
+       R.steps[2].s = 'done'; R.steps[3].s = 'run';
+       const rejected = []; let saved = 0;
+       for (const m of (Array.isArray(inp.matches) ? inp.matches : [])){
+         const need = R.needs.find(n => n.id === String(m.need_id)), e = byId(String(m.expert_id));
+         if (!need || !e || !(R.pool[need.id] || []).includes(e.id)) { rejected.push(m.expert_id); continue }
+         if (R.matches.some(x => x.need_id === need.id && x.expert_id === e.id)) continue;
+         R.matches.push({need_id:need.id, expert_id:e.id, why:String(m.why || '').slice(0,300), watch:String(m.watch_out || '').slice(0,220)}); saved++;
+       }
+       log(3, `<em>propose_matches</em> → <span>${saved} saved</span>${rejected.length ? `, ${rejected.length} rejected (not in results)` : ''}`);
+       R.steps[3].s = 'done'; step(4,'run'); renderResults();
+       return {saved, rejected};
+     }}
+  ];
+}
+async function runLive(text){
+  step(0,'run');
+  ctl = new AbortController();
+  try {
+    const res = await ai(agentPrompt(text), {tools:buildTools(), modelTier:$('deep').checked ? 'default' : 'quick', signal:ctl.signal});
+    if (R.matches.length) R.summary = String(res.text || '').trim().split(/\n\s*\n/).pop().slice(0, 600);
+  } catch (e) {
+    if (e && e.code === 'cancelled') { R.banner = T().stopped; R.steps.forEach(s => { if (s.s === 'run') s.s = 'idle' }); if (!R.needs.length) { renderTrace(); renderResults(); return } }
+    else {
+      R.banner = T().fallback; R.forceDemo = true;
+      if (e && ['tools_unavailable'].includes(e.code)) toolsOK = false;
+      if (e && ['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(e.code)) { ai = null; paintMode() }
+      log(4, `fallback: <span>${esc(e && e.code || 'error')}</span>`);
+    }
+  }
+  complete(text);
+  R.steps.forEach(s => s.s = 'done'); renderTrace(); renderResults();
+}
+
+async function run(){
+  const text = $('ask').value.trim();
+  if (!text) { toast(T().emptyAsk); $('ask').focus(); return }
+  if (running) return;
+  running = true; R = freshRun(); R.text = text;
+  $('work').classList.remove('hidden'); $('runBtn').disabled = true; $('runBtn').textContent = T().running;
+  $('stopBtn').classList.toggle('hidden', !ai);
+  renderTrace(); renderResults();
+  $('work').scrollIntoView({behavior:'smooth', block:'start'});
+  try { if (ai && toolsOK) await runLive(text); else await runLocal(text) }
+  finally { running = false; ctl = null; $('runBtn').disabled = false; $('runBtn').textContent = T().run; $('stopBtn').classList.add('hidden') }
+}
+
+/* ---------------- Results ---------------- */
+function matchCard(m, idx){
+  const e = byId(m.expert_id), need = R.needs.find(n => n.id === m.need_id); if (!e || !need) return '';
+  const f = fit(e, need, R.brief), done = requests.some(r => r.expert_id === e.id && r.run === R.text && r.need === need.title);
+  const row = (label, v) => `<div class="fitrow"><div><span>${esc(label)}</span><b>${v}%</b></div><div class="track"><i style="width:${v}%"></i></div></div>`;
+  return `<article class="mcard ${idx === 0 ? 'top' : ''}">
+    <div>
+      <div class="who"><div class="ava ${e.k === 'talent' ? 't' : ''}" aria-hidden="true">${esc(L(e.n).trim()[0])}</div>
+        <div><h4>${esc(L(e.n))}</h4><div class="role">${esc(L(e.t))}</div>
+          <div class="tags" style="margin-top:8px"><span class="tag ${e.k === 'talent' ? 'l' : 'o'}">${esc(T()[e.k])}</span><span class="tag dash">${esc(T().illus)}</span>${m.alt ? `<span class="tag">${esc(T().alt)}</span>` : ''}</div></div></div>
+      <div class="why"><b>${esc(T().why)}</b><p>${esc(m.why)}</p></div>
+      ${m.watch ? `<div class="watch"><b>${esc(T().watch)}</b>${esc(m.watch)}</div>` : ''}
+      <div class="meta"><span>${esc(T().years(e.y))}</span><span>${esc(L(REGIONS[e.r]))}</span><span>${esc(L(MODES[e.m]))}</span><span>${esc(L(AVAIL[e.a]))}</span><span>${esc(L(e.f))}</span></div>
+      <div class="mact"><button class="btn primary sm" data-intro="${e.id}" data-need="${need.id}" ${done ? 'disabled' : ''}>${esc(done ? T().requested : T().intro)}</button><button class="btn ghost sm" data-dismiss="${e.id}" data-need="${need.id}">${esc(T().notFit)}</button></div>
+    </div>
+    <div class="scorebox"><div class="ring" style="--p:${f.total}"><b>${f.total}<small>%</small></b></div>
+      ${row(T().fitSkill, f.sk)}${row(T().fitSector, f.sec)}${row(T().fitPrac, f.prac)}
+      <div class="scorenote">${esc(T().scoreNote)}</div></div>
+  </article>`;
+}
+function renderResults(){
+  const el = $('results'); let h = '';
+  if (R.banner) h += `<div class="banner">${esc(R.banner)}</div>`;
+  if (R.brief){
+    const b = R.brief;
+    h += `<section class="panel brief"><div class="eyebrow">${esc(T().briefTag)}</div><h2>${esc(b.title || L(SECTORS[b.sector]))}</h2><p>${esc(b.summary)}</p>
+      <div class="tags"><span class="tag o">${esc(L(SECTORS[b.sector]))}</span><span class="tag l">${esc(L(STAGES[b.stage]))}</span>${b.region !== 'unknown' ? `<span class="tag">${esc(L(REGIONS[b.region]))}</span>` : ''}</div>
+      ${R.summary ? `<p class="summary">${esc(R.summary)}</p>` : ''}</section>`;
+  }
+  if (R.needs.length){
+    h += `<section><div class="sech"><h3>${esc(T().needsH)}</h3><span>${esc(T().needsHint)}</span></div><div class="needs">${R.needs.map(n =>
+      `<button class="need ${R.active === n.id ? 'on' : ''}" data-need-pick="${n.id}" aria-pressed="${R.active === n.id}"><small>${esc(T().prio[n.priority])} · ${esc(L(SKILLS[n.skill]))}</small><h4>${esc(n.title)}</h4><p>${esc(n.why)}</p></button>`).join('')}</div></section>`;
+    const need = R.needs.find(n => n.id === R.active) || R.needs[0];
+    const ms = R.matches.filter(m => m.need_id === need.id).map(m => ({m, t:fit(byId(m.expert_id) || {s:[],c:[]}, need, R.brief).total})).sort((a,b) => b.t - a.t).map(x => x.m);
+    h += `<section><div class="sech"><h3>${esc(T().matchesFor)} «${esc(need.title)}»</h3><span>${ms.length ? esc(T().matchCount(ms.length)) : ''}</span></div>
+      <div class="matches">${ms.length ? ms.map(matchCard).join('') : `<div class="empty">${running ? '<span class="tag dash">…</span>' : esc(T().noMore)}</div>`}</div></section>`;
+  }
+  el.innerHTML = h;
+}
+$('results').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.needPick) { R.active = b.dataset.needPick; renderResults() }
+  else if (b.dataset.dismiss) dismiss(b.dataset.need, b.dataset.dismiss);
+  else if (b.dataset.intro) openIntro(b.dataset.need, b.dataset.intro);
+});
+/* Human in the loop: reject a match and get the next candidate from the same search. */
+function dismiss(needId, expertId){
+  const need = R.needs.find(n => n.id === needId);
+  (R.dismissed[needId] ||= []).push(expertId);
+  R.matches = R.matches.filter(m => !(m.need_id === needId && m.expert_id === expertId));
+  const shown = R.matches.filter(m => m.need_id === needId).map(m => m.expert_id);
+  const next = (R.pool[needId] || []).find(id => !shown.includes(id) && !R.dismissed[needId].includes(id));
+  if (next) { const e = byId(next); R.matches.push({need_id:needId, expert_id:next, why:localWhy(e, need, R.brief), watch:localWatch(e, R.brief), alt:true}) }
+  renderResults();
+}
+
+/* ---------------- Intro request drawer ---------------- */
+let draft = null, draftCtl = null;
+function openIntro(needId, expertId){
+  const need = R.needs.find(n => n.id === needId), e = byId(expertId); if (!need || !e) return;
+  draft = {need, e, agenda:T().tplAgenda(need.title)};
+  const base = T().tplMsg(L(e.n), L(e.t), need.title, R.brief.summary);
+  $('drawer').innerHTML = `<div class="eyebrow">${esc(T().dH)}</div><h2 style="font-size:24px">${esc(L(e.n))}</h2><p class="lead" style="font-size:14.5px">${esc(L(e.t))} · ${esc(T().forNeed)}: ${esc(need.title)}</p>
+    <p class="note" style="margin:0" id="dState">${esc(ai ? T().drafting : T().dLead)}</p>
+    <label for="dMsg" style="font-size:13px;color:var(--muted)">${esc(T().dMsg)}</label><textarea id="dMsg">${esc(base)}</textarea>
+    <div><div style="font-size:13px;color:var(--muted);margin-bottom:6px">${esc(T().dAgenda)}</div><ol id="dAgenda">${draft.agenda.map(q => `<li>${esc(q)}</li>`).join('')}</ol></div>
+    <div class="mact" style="margin-top:4px"><button class="btn primary sm" id="dSave">${esc(T().dSave)}</button><button class="btn ghost sm" id="dCopy">${esc(T().dCopy)}</button><button class="btn ghost sm" id="dClose">${esc(T().dClose)}</button></div>
+    <p class="note" style="margin:0">${esc(T().dNote)}</p>`;
+  $('drawer').classList.add('on'); $('scrim').classList.add('on'); $('drawer').setAttribute('aria-hidden','false');
+  $('dClose').onclick = closeIntro;
+  $('dCopy').onclick = async () => { try { await navigator.clipboard.writeText($('dMsg').value); toast(T().copied) } catch {} };
+  $('dSave').onclick = () => {
+    requests.unshift({id:Date.now(), expert_id:e.id, name:L(e.n), title:L(e.t), need:need.title, run:R.text, msg:$('dMsg').value, agenda:draft.agenda});
+    store.set('sam_requests', requests); closeIntro(); renderResults(); renderRequests(); toast(T().saved);
+  };
+  if (ai) draftLive(need, e);
+}
+async function draftLive(need, e){
+  draftCtl = new AbortController();
+  try {
+    const out = await ai.json(`Write an intro request from a cultural entrepreneur to an expert, in ${lang === 'ar' ? 'Arabic' : 'English'}.
+Reply with only JSON: {"message": string, "questions": [string, string, string]}.
+"message": warm, concrete, under 110 words, plain text with line breaks. Mention the project in one line, the specific need, why this person fits, and ask for a 20-minute intro call. No placeholders, no subject line, sign off without a name.
+"questions": three short questions the entrepreneur should ask in the first session, specific to this need.
+
+Project: ${R.brief.title}. ${R.brief.summary}
+Entrepreneur's own words: ${R.text.slice(0, 500)}
+Need: ${need.title} (${SKILLS[need.skill].en}). ${need.why}
+Expert: ${L(e.n)}, ${L(e.t)}; ${e.y} years; skills: ${e.s.join(', ')}; format: ${L(e.f)}`, {modelTier:'quick', signal:draftCtl.signal});
+    if (!draft || draft.e.id !== e.id || !$('dMsg')) return;
+    if (out && typeof out.message === 'string' && out.message.trim()) $('dMsg').value = out.message.trim();
+    if (out && Array.isArray(out.questions) && out.questions.length) { draft.agenda = out.questions.slice(0,3).map(String); $('dAgenda').innerHTML = draft.agenda.map(q => `<li>${esc(q)}</li>`).join('') }
+  } catch {}
+  if ($('dState')) $('dState').textContent = T().dLead;
+}
+function closeIntro(){ draftCtl?.abort(); draft = null; $('drawer').classList.remove('on'); $('scrim').classList.remove('on'); $('drawer').setAttribute('aria-hidden','true') }
+$('scrim').onclick = closeIntro;
+addEventListener('keydown', e => { if (e.key === 'Escape') closeIntro() });
+
+/* ---------------- Requests ---------------- */
+function renderRequests(){
+  $('reqCount').textContent = requests.length; $('reqCount').classList.toggle('hidden', !requests.length);
+  $('reqList').innerHTML = requests.length ? requests.map(r => `<div class="req"><div class="sech" style="margin:0"><h3 style="font-size:17px">${esc(r.name)} <span style="font-family:var(--body);font-weight:400">· ${esc(r.title)}</span></h3><button class="btn ghost sm" data-del="${r.id}">${esc(T().remove)}</button></div>
+    <div class="tags" style="margin:0"><span class="tag o">${esc(T().forNeed)}: ${esc(r.need)}</span><span class="tag dash">${esc(T().reqStatus)}</span></div><pre>${esc(r.msg)}</pre></div>`).join('') : `<div class="empty">${esc(T().reqEmpty)}</div>`;
+}
+$('reqList').addEventListener('click', ev => { const b = ev.target.closest('[data-del]'); if (!b) return; requests = requests.filter(r => String(r.id) !== b.dataset.del); store.set('sam_requests', requests); renderRequests(); if (R.brief) renderResults() });
+
+/* ---------------- Directory ---------------- */
+let jSel = {s:[], c:[]};
+function renderDirectory(){
+  const q = $('dq').value.trim().toLowerCase(), k = $('dkind').value, sk = $('dskill').value;
+  const list = allExperts().filter(e => (!k || e.k === k) && (!sk || e.s.includes(sk)) && (!q || [e.n.ar,e.n.en,e.t.ar,e.t.en].concat(e.s.map(s => SKILLS[s].ar + ' ' + SKILLS[s].en)).join(' ').toLowerCase().includes(q)));
+  $('dir').innerHTML = list.map(e => `<div class="dcard"><div class="who"><div class="ava ${e.k === 'talent' ? 't' : ''}" aria-hidden="true">${esc(L(e.n).trim()[0])}</div><div><h4>${esc(L(e.n))}</h4><div class="role" style="font-size:13.5px">${esc(L(e.t))}</div></div></div>
+    <div class="tags" style="margin:0">${e.s.map(s => `<span class="tag ${e.k === 'talent' ? 'l' : 'o'}">${esc(L(SKILLS[s]))}</span>`).join('')}</div>
+    <p>${esc(T().years(e.y))} · ${esc(L(REGIONS[e.r]))} · ${esc(L(MODES[e.m]))}<br>${esc(e.c.includes('all') ? T().any : e.c.map(c => L(SECTORS[c])).join(lang === 'ar' ? '، ' : ', '))}</p>
+    <div class="tags" style="margin:0;margin-top:auto"><span class="tag">${esc(T()[e.k])}</span><span class="tag dash">${esc(e.own ? T().added : T().illus)}</span>${e.own ? `<button class="chipbtn" data-rm="${e.id}">${esc(T().remove)}</button>` : ''}</div></div>`).join('') || `<div class="empty">—</div>`;
+}
+function fillSelects(){
+  const opt = (v, t, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${esc(t)}</option>`;
+  const k = $('dkind').value, s = $('dskill').value;
+  $('dkind').innerHTML = opt('', T().allKinds, k) + opt('expert', T().expert, k) + opt('talent', T().talent, k);
+  $('dskill').innerHTML = opt('', T().allSkills, s) + Object.entries(SKILLS).map(([key, v]) => opt(key, L(v), s)).join('');
+  $('jKind').innerHTML = opt('expert', T().expert) + opt('talent', T().talent);
+  $('jRegion').innerHTML = Object.entries(REGIONS).map(([key, v]) => opt(key, L(v))).join('');
+  const pick = (map, arr, attr) => Object.entries(map).map(([key, v]) => `<button type="button" class="${arr.includes(key) ? 'on' : ''}" data-${attr}="${key}" aria-pressed="${arr.includes(key)}">${esc(L(v))}</button>`).join('');
+  $('jSkills').innerHTML = pick(SKILLS, jSel.s, 'js'); $('jSectors').innerHTML = pick(SECTORS, jSel.c, 'jc');
+}
+['dq','dkind','dskill'].forEach(id => $(id).addEventListener('input', renderDirectory));
+$('joinToggle').onclick = () => $('joinPanel').classList.toggle('hidden');
+$('joinPanel').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-js],[data-jc]'); if (!b) return;
+  const arr = b.dataset.js ? jSel.s : jSel.c, key = b.dataset.js || b.dataset.jc, i = arr.indexOf(key);
+  if (i >= 0) arr.splice(i, 1); else if (arr.length < 3) arr.push(key);
+  fillSelects();
+});
+$('joinForm').addEventListener('submit', ev => {
+  ev.preventDefault();
+  if (!jSel.s.length) { toast(T().joinNeed); return }
+  const name = $('jName').value.trim(), title = $('jTitle').value.trim();
+  extra.push({id:'u' + Date.now(), own:true, n:{ar:name,en:name}, k:$('jKind').value, t:{ar:title,en:title}, s:[...jSel.s], c:jSel.c.length ? [...jSel.c] : ['all'], r:$('jRegion').value, m:'hybrid', a:3, y:5, f:{ar:'حسب الاتفاق',en:'By agreement'}});
+  store.set('sam_extra', extra); jSel = {s:[], c:[]}; ev.target.reset(); fillSelects(); $('joinPanel').classList.add('hidden'); renderDirectory(); toast(T().joined);
+});
+$('dir').addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (!b) return; extra = extra.filter(e => e.id !== b.dataset.rm); store.set('sam_extra', extra); renderDirectory() });
+
+/* ---------------- Static copy, language, tabs ---------------- */
+function paintMode(){
+  const live = !!ai;
+  $('status').className = 'status ' + (live ? 'live' : 'demo'); $('statusTxt').textContent = live ? T().live : T().demo;
+  $('modeNote').textContent = live ? T().noteLive : T().noteDemo; $('deepWrap').classList.toggle('hidden', !live);
+}
+function paint(){
+  document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-i]').forEach(el => { el.textContent = T()[el.dataset.i] });
+  $('langBtn').textContent = T().langBtn; $('ask').placeholder = T().askPh; $('dq').placeholder = T().dq;
+  if (!running) $('runBtn').textContent = T().run;
+  $('examples').innerHTML = T().ex.map((x, i) => `<button type="button" data-ex="${i}"><b>${esc(T().exLabel[i])}</b>${esc(x)}</button>`).join('');
+  $('pipe').innerHTML = T().pipe.map(p => `<div class="pnode"><small>${p[0]}</small><h4>${esc(p[1])}</h4><p>${esc(p[2])}</p>${p[3] ? `<code>${p[3]}()</code>` : ''}</div>`).join('');
+  $('techTable').innerHTML = `<thead><tr>${T().techHead.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${T().tech.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  $('stats').innerHTML = T().stats.map(s => `<div class="panel stat"><b class="grad">${esc(s[0])}</b><p>${esc(s[1])}</p><a href="${s[3]}" target="_blank" rel="noopener">${esc(T().source)}: ${esc(s[2])}</a></div>`).join('');
+  $('rai').innerHTML = T().rai.map(r => `<div class="panel"><h3 style="font-size:17px">${esc(r[0])}</h3><p style="color:var(--muted);font-size:14.5px;margin-top:6px">${esc(r[1])}</p></div>`).join('');
+  paintMode(); fillSelects(); renderDirectory(); renderRequests();
+  if (!$('work').classList.contains('hidden')) { renderTrace(); renderResults() }
+}
+$('langBtn').onclick = () => { lang = lang === 'ar' ? 'en' : 'ar'; store.set('sam_lang', lang); closeIntro(); paint() };
+$('examples').addEventListener('click', ev => { const b = ev.target.closest('[data-ex]'); if (!b) return; $('ask').value = T().ex[+b.dataset.ex]; $('ask').focus() });
+$('runBtn').onclick = run;
+$('stopBtn').onclick = () => ctl?.abort();
+$('ask').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run() });
+const VIEWS = ['match','directory','requests','how'];
+function show(v){
+  if (!VIEWS.includes(v)) v = 'match';
+  VIEWS.forEach(x => $('v-' + x).classList.toggle('on', x === v));
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+}
+$('tabs').addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; show(b.dataset.view); try { history.replaceState(null, '', '#' + b.dataset.view) } catch {} scrollTo({top:0}) });
+addEventListener('hashchange', () => show(location.hash.slice(1)));
+let toastT; function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2400) }
+
+/* ---------------- Capabilities: live Claude and voice input, when the host offers them ---------------- */
+async function connect(){
+  if (!window.claude || typeof window.claude.use !== 'function') return;
+  try {
+    const s = await window.claude.use('sample');
+    if (s) { ai = s; try { const lim = await s.limits(); toolsOK = !!lim.tools } catch { toolsOK = true } paintMode() }
+  } catch {}
+  try {
+    const d = await window.claude.use('dictation');
+    if (d) {
+      dict = d; let listening = false, base = '';
+      $('mic').classList.remove('hidden');
+      d.onPartial(({text}) => { $('ask').value = (base + ' ' + text).trim() });
+      d.onFinal(({text}) => { base = (base + ' ' + text).trim(); $('ask').value = base });
+      d.onState(({state}) => { listening = state === 'listening'; $('mic').classList.toggle('rec', listening) });
+      $('mic').onclick = () => { if (listening) { d.stop().catch(() => {}) } else { base = $('ask').value.trim(); d.start().catch(e => { if (e && e.code === 'not_granted') $('mic').classList.add('hidden') }) } };
+    }
+  } catch {}
+}
+
+paint(); show(location.hash.slice(1)); connect();
+</script>
+</body>
+</html>
